@@ -80,6 +80,11 @@ namespace Avalonia.Controls
                 nameof(RowDrop),
                 RoutingStrategies.Bubble);
 
+        public static readonly RoutedEvent<RoutedEventArgs> RowDragCancelEvent =
+            RoutedEvent.Register<TreeDataGrid, RoutedEventArgs>(
+                nameof(RowDragCancel),
+                RoutingStrategies.Bubble);
+
         private const double AutoScrollMargin = 60;
         private const int AutoScrollSpeed = 50;
         private IElementFactory? _elementFactory;
@@ -228,6 +233,12 @@ namespace Avalonia.Controls
         {
             add => AddHandler(RowDropEvent, value!);
             remove => RemoveHandler(RowDropEvent, value!);
+        }
+
+        public event EventHandler<RoutedEventArgs>? RowDragCancel
+        {
+            add => AddHandler(RowDragCancelEvent, value!);
+            remove => RemoveHandler(RowDragCancelEvent, value!);
         }
 
         public event CancelEventHandler? SelectionChanging;
@@ -604,7 +615,15 @@ namespace Avalonia.Controls
             }
         }
 
-        private void OnDragLeave(RoutedEventArgs e) => StopDrag();
+        private void OnDragLeave(RoutedEventArgs e) 
+        {
+            var route = BuildEventRoute(RowDragCancelEvent);
+            if (route.HasHandlers)
+            {
+                route.RaiseEvent(this, e);
+            }
+            StopDrag();
+        }
 
         private void OnDrop(DragEventArgs e)
         {

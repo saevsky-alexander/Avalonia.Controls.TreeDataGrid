@@ -27,7 +27,9 @@
         </StackPanel>
         <TreeDataGrid Name="countries"
                       Source="{Binding Countries.Source}"
-                      AutoDragDropRows="True">
+                      AutoDragDropRows="True"
+                      RowDragOver="DragDrop_RowDragOver1"
+                      RowDragCancel="DragDrop_Cancel">
           <TreeDataGrid.Styles>
             <Style Selector="TreeDataGrid TreeDataGridRow:nth-last-child(2n)">
               <Setter Property="Background" Value="#fff8f8f8"/>
@@ -89,7 +91,8 @@
                       Source="{Binding DragDrop.Source}"
                       AutoDragDropRows="True"
                       RowDragStarted="DragDrop_RowDragStarted"
-                      RowDragOver="DragDrop_RowDragOver"/>
+                      RowDragOver="DragDrop_RowDragOver"
+                      RowDragCancel="DragDrop_Cancel"/>
       </DockPanel>
     </TabItem>
   </TabControl>

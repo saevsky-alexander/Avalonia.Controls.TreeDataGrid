@@ -97,6 +97,7 @@ namespace TreeDataGridDemo
 
         private void DragDrop_RowDragStarted(object? sender, TreeDataGridRowDragStartedEventArgs e)
         {
+             Console.WriteLine("------------ Start --------------");
             foreach (DragDropItem i in e.Models)
             {
                 if (!i.AllowDrag)
@@ -106,10 +107,20 @@ namespace TreeDataGridDemo
 
         private void DragDrop_RowDragOver(object? sender, TreeDataGridRowDragEventArgs e)
         {
+            Console.WriteLine("------------ Over --------------");
             if (e.Position == TreeDataGridRowDropPosition.Inside &&
                 e.TargetRow.Model is DragDropItem i &&
                 !i.AllowDrop)
                 e.Inner.DragEffects = DragDropEffects.None;
+        }
+        private void DragDrop_RowDragOver1(object? sender, TreeDataGridRowDragEventArgs e)
+        {
+            Console.WriteLine("------------ Over --------------");
+        }
+
+        private void DragDrop_Cancel(object? sender, RoutedEventArgs e)
+        {
+            Console.WriteLine("------------ Leave --------------");
         }
 
         private void UpdateRealizedCount()
