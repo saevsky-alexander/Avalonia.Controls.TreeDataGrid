@@ -15,10 +15,9 @@ namespace Avalonia.Controls.Models.TreeDataGrid
         [AllowNull] private T? _value;
         [AllowNull] private T? _cancelValue;
         private bool _isEditing;
+        private ITextCellOptions? _options;
 
-#pragma warning disable CS8618
         public TextCell(T? value)
-#pragma warning restore CS8618
         {
             _value = value;
             IsReadOnly = true;
@@ -27,11 +26,11 @@ namespace Avalonia.Controls.Models.TreeDataGrid
         public TextCell(
             ISubject<BindingValue<T>> binding,
             bool isReadOnly,
-            TextTrimming textTrimming)
+            ITextCellOptions? options = null)
         {
             _binding = binding;
             IsReadOnly = isReadOnly;
-            TextTrimming = textTrimming;
+            _options = options;
 
             _subscription = binding.Subscribe(x =>
             {
@@ -41,8 +40,16 @@ namespace Avalonia.Controls.Models.TreeDataGrid
         }
 
         public bool CanEdit => !IsReadOnly;
+        public BeginEditGestures EditGestures => _options?.BeginEditGestures ?? BeginEditGestures.Default;
         public bool IsReadOnly { get; }
-        public TextTrimming TextTrimming { get; }
+        public TextTrimming TextTrimming => _options?.TextTrimming ?? TextTrimming.None;
+        public TextWrapping TextWrapping => _options?.TextWrapping ?? TextWrapping.NoWrap;
+
+        public string? Text
+        {
+            get => _value?.ToString();
+            set => Value = (T?)Convert.ChangeType(value, typeof(T));
+        }
 
         public T? Value
         {

@@ -1,4 +1,5 @@
-﻿using Avalonia.Reactive;
+﻿using Avalonia.Controls.Experimental.Data.Core;
+using Avalonia.Experimental.Data.Core;
 
 #nullable enable
 
@@ -7,9 +8,9 @@ namespace Avalonia.Experimental.Data
     internal class DataContextRoot<T> : SingleSubscriberObservableBase<T?>
         where T : class
     {
-        private readonly IStyledElement _source;
+        private readonly StyledElement _source;
 
-        public DataContextRoot(IStyledElement source)
+        public DataContextRoot(StyledElement source)
         {
             _source = source;
         }

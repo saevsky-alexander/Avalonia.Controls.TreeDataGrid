@@ -2,40 +2,56 @@
 using System.ComponentModel;
 using Avalonia.Controls.Metadata;
 using Avalonia.Controls.Models.TreeDataGrid;
+using Avalonia.Controls.Selection;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.LogicalTree;
+using Avalonia.Platform;
+using Avalonia.VisualTree;
 
 namespace Avalonia.Controls.Primitives
 {
-    [PseudoClasses(":selected", ":editing")]
+    [PseudoClasses(":editing")]
     public abstract class TreeDataGridCell : TemplatedControl, ITreeDataGridCell
     {
         public static readonly DirectProperty<TreeDataGridCell, bool> IsSelectedProperty =
             AvaloniaProperty.RegisterDirect<TreeDataGridCell, bool>(
                 nameof(IsSelected),
-                o => o.IsSelected,
-                (o, v) => o.IsSelected = v);
+                o => o.IsSelected);
 
-        private bool _isEditing;
+        private static readonly Point s_invalidPoint = new Point(double.NaN, double.NaN);
         private bool _isSelected;
         private TreeDataGrid? _treeDataGrid;
+        private Point _pressedPoint = s_invalidPoint;
 
         static TreeDataGridCell()
         {
             FocusableProperty.OverrideDefaultValue<TreeDataGridCell>(true);
+            DoubleTappedEvent.AddClassHandler<TreeDataGridCell>((x, e) => x.OnDoubleTapped(e));
         }
 
         public int ColumnIndex { get; private set; } = -1;
         public int RowIndex { get; private set; } = -1;
+        public bool IsEditing { get; private set; }
         public ICell? Model { get; private set; }
 
         public bool IsSelected
         {
             get => _isSelected;
-            set => SetAndRaise(IsSelectedProperty, ref _isSelected, value);
+            private set => SetAndRaise(IsSelectedProperty, ref _isSelected, value);
         }
 
-        public virtual void Realize(IElementFactory factory, ICell model, int columnIndex, int rowIndex)
+        public bool IsEffectivelySelected
+        {
+            get => IsSelected || this.FindAncestorOfType<TreeDataGridRow>()?.IsSelected == true;
+        }
+
+        public virtual void Realize(
+            TreeDataGridElementFactory factory,
+            ITreeDataGridSelectionInteraction? selection,
+            ICell model,
+            int columnIndex,
+            int rowIndex)
         {
             if (columnIndex < 0)
                 throw new IndexOutOfRangeException("Invalid column index.");
@@ -43,6 +59,7 @@ namespace Avalonia.Controls.Primitives
             ColumnIndex = columnIndex;
             RowIndex = rowIndex;
             Model = model;
+            IsSelected = selection?.IsCellSelected(columnIndex, rowIndex) ?? false;
 
             _treeDataGrid?.RaiseCellPrepared(this, columnIndex, RowIndex);
         }
@@ -54,44 +71,67 @@ namespace Avalonia.Controls.Primitives
             Model = null;
         }
 
-        protected virtual bool CanEdit => false;
-
         protected void BeginEdit()
         {
-            if (!_isEditing)
+            if (!IsEditing)
             {
-                _isEditing = true;
-                (DataContext as IEditableObject)?.BeginEdit();
+                IsEditing = true;
+                (Model as IEditableObject)?.BeginEdit();
                 PseudoClasses.Add(":editing");
             }
         }
 
         protected void CancelEdit()
         {
-            if (EndEditCore())
-                (DataContext as IEditableObject)?.CancelEdit();
+            if (EndEditCore() && Model is IEditableObject editable)
+                editable.CancelEdit();
         }
 
         protected void EndEdit()
         {
-            if (EndEditCore())
-                (DataContext as IEditableObject)?.EndEdit();
+            if (EndEditCore() && Model is IEditableObject editable)
+                editable.EndEdit();
+        }
+
+        protected void SubscribeToModelChanges()
+        {
+            if (Model is INotifyPropertyChanged inpc)
+                inpc.PropertyChanged += OnModelPropertyChanged;
+        }
+
+        protected void UnsubscribeFromModelChanges()
+        {
+            if (Model is INotifyPropertyChanged inpc)
+                inpc.PropertyChanged -= OnModelPropertyChanged;
         }
 
         protected override void OnAttachedToLogicalTree(LogicalTreeAttachmentEventArgs e)
         {
             _treeDataGrid = this.FindLogicalAncestorOfType<TreeDataGrid>();
             base.OnAttachedToLogicalTree(e);
-
-            // The cell may be realized before being parented. In this case raise the CellPrepared event here.
-            if (_treeDataGrid is not null && ColumnIndex >= 0 && RowIndex >= 0)
-                _treeDataGrid.RaiseCellPrepared(this, ColumnIndex, RowIndex);
         }
 
         protected override void OnDetachedFromLogicalTree(LogicalTreeAttachmentEventArgs e)
         {
             _treeDataGrid = null;
             base.OnDetachedFromLogicalTree(e);
+        }
+
+        protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+        {
+            base.OnAttachedToVisualTree(e);
+
+            // The cell may be realized before being parented. In this case raise the CellPrepared event here.
+            if (_treeDataGrid is not null && ColumnIndex >= 0 && RowIndex >= 0)
+                _treeDataGrid.RaiseCellPrepared(this, ColumnIndex, RowIndex);
+        }
+
+        protected override void OnLostFocus(RoutedEventArgs e)
+        {
+            base.OnLostFocus(e);
+
+            if (!IsKeyboardFocusWithin && IsEditing)
+                EndEdit();
         }
 
         protected override Size MeasureOverride(Size availableSize)
@@ -106,42 +146,120 @@ namespace Avalonia.Controls.Primitives
             return result;
         }
 
-        protected override void OnKeyDown(KeyEventArgs e)
+        protected virtual void OnDoubleTapped(TappedEventArgs e)
         {
-            base.OnKeyDown(e);
-
-            if (!_isEditing && CanEdit && !e.Handled && e.Key == Key.F2)
+            if (Model is not null &&
+                !e.Handled &&
+                !IsEditing &&
+                Model.CanEdit &&
+                IsEnabledEditGesture(BeginEditGestures.DoubleTap, Model.EditGestures))
             {
                 BeginEdit();
                 e.Handled = true;
             }
+        }
+
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            base.OnKeyDown(e);
+
+            if (Model is null || e.Handled)
+                return;
+
+            if (e.Key == Key.F2 && 
+                !IsEditing && 
+                Model.CanEdit &&
+                IsEnabledEditGesture(BeginEditGestures.F2, Model.EditGestures))
+            {
+                BeginEdit();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Enter && IsEditing)
+            {
+                EndEdit();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape && IsEditing)
+            {
+                CancelEdit();
+                e.Handled = true;
+            }
+        }
+
+        protected virtual void OnModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
         }
 
         protected override void OnPointerPressed(PointerPressedEventArgs e)
         {
             base.OnPointerPressed(e);
 
-            if (!_isEditing && CanEdit && !e.Handled && IsSelected)
+            if (Model is not null &&
+                !e.Handled &&
+                !IsEditing &&
+                Model.CanEdit &&
+                IsEnabledEditGesture(BeginEditGestures.Tap, Model.EditGestures))
             {
-                BeginEdit();
+                _pressedPoint = e.GetCurrentPoint(null).Position;
                 e.Handled = true;
             }
+            else
+            {
+                _pressedPoint = s_invalidPoint;
+            }
+        }
+
+        protected override void OnPointerReleased(PointerReleasedEventArgs e)
+        {
+            base.OnPointerReleased(e);
+
+            if (Model is not null &&
+                !e.Handled &&
+                !IsEditing &&
+                !double.IsNaN(_pressedPoint.X) &&
+                Model.CanEdit &&
+                IsEnabledEditGesture(BeginEditGestures.Tap, Model.EditGestures))
+            {
+                var point = e.GetCurrentPoint(this);
+                var settings = TopLevel.GetTopLevel(this)?.PlatformSettings;
+                var tapSize = settings?.GetTapSize(point.Pointer.Type) ?? new Size(4, 4);
+                var tapRect = new Rect(_pressedPoint, new Size())
+                       .Inflate(new Thickness(tapSize.Width, tapSize.Height));
+
+                if (new Rect(Bounds.Size).ContainsExclusive(point.Position) &&
+                    tapRect.ContainsExclusive(e.GetCurrentPoint(null).Position))
+                {
+                    BeginEdit();
+                    e.Handled = true;
+                }
+            }
+
+            _pressedPoint = s_invalidPoint;
         }
 
         protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
         {
             if (change.Property == IsSelectedProperty)
             {
-                PseudoClasses.Set(":selected", change.GetNewValue<bool>());
+                PseudoClasses.Set(":selected", IsSelected);
             }
+
+            base.OnPropertyChanged(change);
+        }
+
+        internal void UpdateRowIndex(int index) => RowIndex = index;
+
+        internal void UpdateSelection(ITreeDataGridSelectionInteraction? selection)
+        {
+            IsSelected = selection?.IsCellSelected(ColumnIndex, RowIndex) ?? false;
         }
 
         private bool EndEditCore()
         {
-            if (_isEditing)
+            if (IsEditing)
             {
                 var restoreFocus = IsKeyboardFocusWithin;
-                _isEditing = false;
+                IsEditing = false;
                 PseudoClasses.Remove(":editing");
                 if (restoreFocus)
                     Focus();
@@ -149,6 +267,15 @@ namespace Avalonia.Controls.Primitives
             }
 
             return false;
+        }
+
+        private bool IsEnabledEditGesture(BeginEditGestures gesture, BeginEditGestures enabledGestures)
+        {
+            if (!enabledGestures.HasFlag(gesture))
+                return false;
+
+            return enabledGestures.HasFlag(BeginEditGestures.WhenSelected) ?
+                IsEffectivelySelected : true;
         }
     }
 }
