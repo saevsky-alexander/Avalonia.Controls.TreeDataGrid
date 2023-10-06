@@ -192,7 +192,7 @@ namespace Avalonia.Controls.Models.TreeDataGrid
                 throw new NotSupportedException("Unexpected row type.");
         }
 
-        internal bool TryGetRowIndex(in IndexPath modelIndex, out int rowIndex, int fromRowIndex = 0)
+        public bool TryGetRowIndex(in IndexPath modelIndex, out int rowIndex, int fromRowIndex = 0)
         {
             if (modelIndex.Count == 0)
             {
