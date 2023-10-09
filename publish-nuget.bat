@@ -1,1 +1,1 @@
-dotnet nuget push "src\Avalonia.Controls.TreeDataGrid\bin\Release\Avalonia.Controls.TreeDataGrid.11.0.4.nupkg" --api-key "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" --source "github" 
+dotnet nuget push "src\Avalonia.Controls.TreeDataGrid\bin\Release\Avalonia.Controls.TreeDataGrid.11.0.4.1.nupkg" --api-key "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" --source "github" 
