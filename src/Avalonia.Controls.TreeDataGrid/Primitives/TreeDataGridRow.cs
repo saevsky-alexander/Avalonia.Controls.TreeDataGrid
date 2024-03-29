@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Text;
 using Avalonia.Controls.Metadata;
 using Avalonia.Controls.Models.TreeDataGrid;
 using Avalonia.Controls.Selection;
@@ -82,8 +83,9 @@ namespace Avalonia.Controls.Primitives
             Rows = rows;
             DataContext = rows?[rowIndex].Model;
             IsSelected = selection?.IsRowSelected(rowIndex) ?? false;
-            UpdateIndex(rowIndex);
+            RowIndex = rowIndex;
             UpdateSelection(selection);
+            CellsPresenter?.Realize(rowIndex);
             _treeDataGrid?.RaiseRowPrepared(this, RowIndex);
         }
 
@@ -94,6 +96,9 @@ namespace Avalonia.Controls.Primitives
 
         public void UpdateIndex(int index)
         {
+            if (RowIndex == -1)
+                throw new InvalidOperationException("Row is not realized.");
+
             RowIndex = index;
             CellsPresenter?.UpdateRowIndex(index);
         }
@@ -176,6 +181,15 @@ namespace Avalonia.Controls.Primitives
         {
             IsSelected = selection?.IsRowSelected(RowIndex) ?? false;
             CellsPresenter?.UpdateSelection(selection);
+        }
+
+        public void UnrealizeOnItemRemoved()
+        {
+            _treeDataGrid?.RaiseRowClearing(this, RowIndex);
+            RowIndex = -1;
+            DataContext = null;
+            IsSelected = false;
+            CellsPresenter?.UnrealizeOnRowRemoved();
         }
     }
 }

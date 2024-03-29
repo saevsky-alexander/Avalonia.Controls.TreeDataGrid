@@ -51,6 +51,12 @@ namespace Avalonia.Controls.Primitives
             ChildIndexChanged?.Invoke(this, new ChildIndexChangedEventArgs(element, ((TreeDataGridRow)element).RowIndex));
         }
 
+        protected override void UnrealizeElementOnItemRemoved(Control element)
+        {
+            ((TreeDataGridRow)element).UnrealizeOnItemRemoved();
+            ChildIndexChanged?.Invoke(this, new ChildIndexChangedEventArgs(element, ((TreeDataGridRow)element).RowIndex));
+        }
+
         protected override Size ArrangeOverride(Size finalSize)
         {
             Columns?.CommitActualWidths();
@@ -74,6 +80,13 @@ namespace Avalonia.Controls.Primitives
                     oldValue.LayoutInvalidated -= OnColumnLayoutInvalidated;
                 if (newValue is object)
                     newValue.LayoutInvalidated += OnColumnLayoutInvalidated;
+
+                // When for existing Presenter Columns would be recreated they won't get Viewport set so we need to track that
+                // and pass Viewport for a newly created object. 
+                if (oldValue != null && newValue != null)
+                {
+                    newValue.ViewportChanged(Viewport);
+                }
             }
 
             base.OnPropertyChanged(change);

@@ -6,7 +6,6 @@ using Avalonia.Controls.Selection;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.LogicalTree;
-using Avalonia.Platform;
 using Avalonia.VisualTree;
 
 namespace Avalonia.Controls.Primitives
@@ -53,8 +52,12 @@ namespace Avalonia.Controls.Primitives
             int columnIndex,
             int rowIndex)
         {
+            if (ColumnIndex >= 0 || RowIndex >= 0)
+                throw new InvalidOperationException("Cell is already realized.");
             if (columnIndex < 0)
                 throw new IndexOutOfRangeException("Invalid column index.");
+            if (rowIndex < 0)
+                throw new IndexOutOfRangeException("Invalid row index.");
 
             ColumnIndex = columnIndex;
             RowIndex = rowIndex;
@@ -247,7 +250,12 @@ namespace Avalonia.Controls.Primitives
             base.OnPropertyChanged(change);
         }
 
-        internal void UpdateRowIndex(int index) => RowIndex = index;
+        internal void UpdateRowIndex(int index)
+        {
+            if (RowIndex == -1)
+                throw new InvalidOperationException("Cell is not realized.");
+            RowIndex = index;
+        }
 
         internal void UpdateSelection(ITreeDataGridSelectionInteraction? selection)
         {
